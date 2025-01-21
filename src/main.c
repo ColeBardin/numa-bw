@@ -18,10 +18,11 @@ int main(int argc, char **argv)
         {
             case 'h':
                 USAGE;
-                puts("  -h        help, prints out the menu");
-                puts("  -n numas  number of numa nodes to use. 0/default, use all available nodes");
-                puts("  -c cpn    number of cores per numa node to use. 0/default, will use maximum number of cores per numa node");
-                puts("  -m mem    total amount of memory to allocate in bytes. 0/default, will utilize all available memory");
+                puts("  -h          prints out help menu");
+                puts("  -n <numas>  number of numa nodes to use. 0/default, use all available nodes");
+                puts("  -c <cpn>    number of cores per numa node to use. 0/default, will use maximum number of cores per numa node");
+                puts("  -m <mem>    total amount of memory to allocate in bytes. 0/default, will utilize all available memory");
+                return EXIT_SUCCESS;
             case 'n':
                 numas = atoi(optarg);    
                 if(numas < 0)
