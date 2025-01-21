@@ -9,9 +9,13 @@
 #define V_MAJOR 0
 #define V_MINOR 0
 #define V_BUG   1
-#define USAGE fprintf(stderr, "Usage: %s [-h] [-n numas] [-c cpn] [-m mem]\n", argv[0])
+#define USAGE fprintf(stderr, "Usage: %s [-h] [-n numas] [-c cpn] [-m mem] [-r repeats] [-k kernel]\n", argv[0])
+#define FAIL_ARG(x,y) fprintf(stderr, "ERROR: failed to parse %c flag argument: %s\n", x, y) 
 #define B_TO_MB(x) x / 1000000
 #define B_TO_GB(x) x / 1000000000
+
+const char *k_names[] = {"Triadd", "Copy", "Read", "Write"};
+const int k_usage[] = {3, 2, 1, 1};
 
 int main(int argc, char **argv)
 {
@@ -27,6 +31,8 @@ int main(int argc, char **argv)
     uint64_t mem_per_node = 0;
     long long free64;
     int min_numa_index = 0;
+    int repeats = 1;
+    int kernel = 0;
 
     if(numa_available() == -1)
     {
@@ -37,31 +43,33 @@ int main(int argc, char **argv)
     sys_cores = numa_num_configured_cpus();
     max_cpn = sys_cores / sys_numas;
 
-    while((opt = getopt(argc, argv, "hn:c:m:")) != -1)
+    while((opt = getopt(argc, argv, "hn:c:m:r:k:")) != -1)
     {
         switch(opt)
         {
             case 'h':
                 USAGE;
-                puts("  -h          prints out help menu");
-                puts("  -n <numas>  number of numa nodes to use. 0/default, use all available nodes");
-                puts("  -c <cpn>    number of cores per numa node to use. 0/default, will use maximum number of cores per numa node");
-                puts("  -m <mem>    total amount of memory to allocate in bytes. 0/default, will utilize all available memory");
+                puts("  -h            prints out help menu");
+                puts("  -n <numas>    number of numa nodes to use. 0/default, use all available nodes");
+                puts("  -c <cpn>      number of cores per numa node to use. 0/default, will use maximum number of cores per numa node");
+                puts("  -m <mem>      total amount of memory to allocate in bytes. 0/default, will utilize all available memory");
+                puts("  -r <repeats>  number of times to repeat each kernel. default is 1");
+                puts("  -k <kernel>   kernel to run [0-3]. default is 0");
                 return EXIT_SUCCESS;
             case 'n':
                 numas = atoi(optarg);    
                 if(numas < 0)
                 {
-                    fprintf(stderr, "ERROR: failed to parse n flag argument: %s\n", optarg); 
+                    FAIL_ARG(opt, optarg);
                     USAGE;
                     return EXIT_FAILURE;
                 }
                 break;
             case 'c':
-                cpn= atoi(optarg);    
+                cpn = atoi(optarg);    
                 if(cpn < 0)
                 {
-                    fprintf(stderr, "ERROR: failed to parse c flag argument: %s\n", optarg); 
+                    FAIL_ARG(opt, optarg);
                     USAGE;
                     return EXIT_FAILURE;
                 }
@@ -70,7 +78,25 @@ int main(int argc, char **argv)
                 mem = strtoull(optarg, NULL, 10);    
                 if(mem < 0)
                 {
-                    fprintf(stderr, "ERROR: failed to parse m flag argument: %s\n", optarg); 
+                    FAIL_ARG(opt, optarg);
+                    USAGE;
+                    return EXIT_FAILURE;
+                }
+                break;
+            case 'r':
+                repeats = atoi(optarg);    
+                if(repeats < 1)
+                {
+                    FAIL_ARG(opt, optarg);
+                    USAGE;
+                    return EXIT_FAILURE;
+                }
+                break;
+            case 'k':
+                kernel = atoi(optarg);    
+                if(kernel < 0 || kernel > 3)
+                {
+                    FAIL_ARG(opt, optarg);
                     USAGE;
                     return EXIT_FAILURE;
                 }
@@ -114,11 +140,14 @@ int main(int argc, char **argv)
     else if(mem == 0) mem = mem_per_node * numas;
 
     printf("~~~~~~~~~~~~~ NUMA BW V%d.%d.%d ~~~~~~~~~~~~~\n", V_MAJOR, V_MINOR, V_BUG);
-    printf("Numas Nodes:       %d out of %d Nodes\n", numas, sys_numas);
-    printf("Cores per Node:    %d out of %d Cores/Node\n", cpn, max_cpn);
-    printf("Total Cores:       %d out of %d Cores\n", cpn * numas, sys_cores);
-    printf("Memory Per Node:   %zu MB/Node\n", B_TO_MB(mem_per_node));
-    printf("Total Memory:      %zu MB\n", B_TO_MB(mem));
+    printf("Kernel:                  %d - %s\n", kernel, k_names[kernel]);
+    printf("Numas Nodes:             %d out of %d Nodes\n", numas, sys_numas);
+    printf("Cores per Node:          %d out of %d Cores/Node\n", cpn, max_cpn);
+    printf("Total Cores:             %d out of %d Cores\n", cpn * numas, sys_cores);
+    printf("Memory Per Node:         %zu MB/Node\n", B_TO_MB(mem_per_node));
+    printf("Total Memory:            %zu MB\n", B_TO_MB(mem));
+    printf("Kernel Repeats:          %d\n", repeats);
+    printf("Total Simulated Memory:  %zu MB\n", B_TO_MB(mem * repeats * k_usage[kernel]));
     return 0;
 }
 
