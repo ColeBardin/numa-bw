@@ -1,6 +1,7 @@
 CC=cc
 CFLAGS += --std=c99
 CFLAGS += -pthread
+CFLAGS += -lnuma
 
 SRC=src
 OBJ=obj
