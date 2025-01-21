@@ -9,13 +9,15 @@
 #define V_MAJOR 0
 #define V_MINOR 0
 #define V_BUG   1
-#define USAGE fprintf(stderr, "Usage: %s [-h] [-n numas] [-c cpn] [-m mem] [-r repeats] [-k kernel]\n", argv[0])
+#define USAGE fprintf(stderr, "Usage: %s [-h] [-n numas] [-c cpn] [-m mem] [-p passes] [-k kernel]\n", argv[0])
 #define FAIL_ARG(x,y) fprintf(stderr, "ERROR: failed to parse %c flag argument: %s\n", x, y) 
 #define B_TO_MB(x) x / 1000000
 #define B_TO_GB(x) x / 1000000000
 
 const char *k_names[] = {"Triadd", "Copy", "Read", "Write"};
 const int k_usage[] = {3, 2, 1, 1};
+
+int scale_bytes(uint64_t bytes, int *scaled);
 
 int main(int argc, char **argv)
 {
@@ -31,7 +33,7 @@ int main(int argc, char **argv)
     uint64_t mem_per_node = 0;
     long long free64;
     int min_numa_index = 0;
-    int repeats = 1;
+    int passes = 1;
     int kernel = 0;
 
     if(numa_available() == -1)
@@ -43,7 +45,7 @@ int main(int argc, char **argv)
     sys_cores = numa_num_configured_cpus();
     max_cpn = sys_cores / sys_numas;
 
-    while((opt = getopt(argc, argv, "hn:c:m:r:k:")) != -1)
+    while((opt = getopt(argc, argv, "hn:c:m:p:k:")) != -1)
     {
         switch(opt)
         {
@@ -53,8 +55,8 @@ int main(int argc, char **argv)
                 puts("  -n <numas>    number of numa nodes to use. 0/default, use all available nodes");
                 puts("  -c <cpn>      number of cores per numa node to use. 0/default, will use maximum number of cores per numa node");
                 puts("  -m <mem>      total amount of memory to allocate in bytes. 0/default, will utilize all available memory");
-                puts("  -r <repeats>  number of times to repeat each kernel. default is 1");
-                puts("  -k <kernel>   kernel to run [0-3]. default is 0");
+                puts("  -p <passes>   number of times to pass over or run each kernel. default is 1");
+                puts("  -k <kernel>   kernel to run 0(Triad), 1(Copy), 2(Read), 3(Write). default is 0");
                 return EXIT_SUCCESS;
             case 'n':
                 numas = atoi(optarg);    
@@ -83,9 +85,9 @@ int main(int argc, char **argv)
                     return EXIT_FAILURE;
                 }
                 break;
-            case 'r':
-                repeats = atoi(optarg);    
-                if(repeats < 1)
+            case 'p':
+                passes = atoi(optarg);    
+                if(passes < 1)
                 {
                     FAIL_ARG(opt, optarg);
                     USAGE;
@@ -144,10 +146,22 @@ int main(int argc, char **argv)
     printf("Numas Nodes:             %d out of %d Nodes\n", numas, sys_numas);
     printf("Cores per Node:          %d out of %d Cores/Node\n", cpn, max_cpn);
     printf("Total Cores:             %d out of %d Cores\n", cpn * numas, sys_cores);
-    printf("Memory Per Node:         %zu MB/Node\n", B_TO_MB(mem_per_node));
-    printf("Total Memory:            %zu MB\n", B_TO_MB(mem));
-    printf("Kernel Repeats:          %d\n", repeats);
-    printf("Total Simulated Memory:  %zu MB\n", B_TO_MB(mem * repeats * k_usage[kernel]));
+    printf("Memory Per Node:         %.2f GB/Node\n", B_TO_MB(mem_per_node) / 1000.0);
+    printf("Total Memory:            %.2f GB\n", B_TO_MB(mem) / 1000.0);
+    printf("Kernel Passes:           %d\n", passes);
+    printf("Total Simulated Memory:  %.2f GB\n", B_TO_MB(mem * passes * k_usage[kernel]) / 1000.0);
     return 0;
+}
+
+int scale_bytes(uint64_t bytes, int *scaled)
+{
+    int factors = 0;
+    while(bytes > 1000) 
+    {
+        bytes /= 1000;
+        factors++;
+    }
+    *scaled = (int)bytes;
+    return factors;
 }
 
